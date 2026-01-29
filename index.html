@@ -1,0 +1,1550 @@
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="og:title" content="Quiz - M11S Arena Split"/>
+<!--<meta name="og:url" content="https://cupnoodle.moe/m4s/sunrise/"/>
+<meta name="og:image" content="https://cupnoodle.moe/img/cupsmol.jpg"/> -->
+<meta name="og:description" content="Practice mechanics."/>
+<title>mrak's quiz.</title>
+
+<!-- Credit to CupNoodle.moe -->
+<script src="quizFunctions.js"></script>
+<link rel="stylesheet" href="quizStyles.css">
+
+<style>
+
+    @keyframes fadeOut
+    {
+        0%
+        {
+            opacity: 1;
+        }
+        100%
+        {
+            opacity: 0;
+        }
+    }
+
+    @keyframes resolvePuddle
+    {
+        0%
+        {
+            opacity: 0;
+        }
+        15%
+        {
+            opacity: 0.7;
+        }
+        85%
+        {
+            opacity: 0.7;
+        }
+        100%
+        {
+            opacity: 0;
+        }
+    }
+
+    @keyframes fadeIn
+    {
+        0%
+        {
+            opacity: 0;
+        }
+        100%
+        {
+            opacity: 1;
+        }
+    }
+
+    .aoeMarker 
+    {
+        display: none; 
+        position: absolute;
+        opacity: 1;
+        transform-origin: 122px 0;
+        /*transition: opacity 0.3s ease;*/
+        /*animation: resolvePuddle 2s linear;*/
+    }
+
+
+    .aoeTelegraph
+    {
+        display: block; 
+        position: absolute;
+        opacity: 1;
+        transform-origin: 122px 0;
+    }
+
+    .tether
+    {
+        position: absolute; 
+        margin: 0; 
+        padding: 0; 
+        height: 0px;
+        border-width: 4px; 
+        border-style: dashed;
+        transform-origin: 0%;
+        top: 390px; 
+        left: 490px;
+        transition: left 0.5s ease, top 0.5s ease, transform 0.5s ease, width 0.5s ease;
+        border-color: #ff006f;
+    }
+
+    .tetherAoE
+    {
+        position: absolute; 
+        margin: 0; 
+        padding: 0; 
+        height: 100px;
+        border-width: 2px; 
+        border-style: solid;
+        transform-origin: 0%;
+        top: 390px; 
+        left: 490px;
+        transition: opacity 0.5s ease, width 0.5s ease;
+        border-color: #ff5e00ea;
+        margin-top: -50px;
+        margin-left: 0px;
+        background: linear-gradient(to right, #ff800096, #ff5e0086);
+    }
+
+    .bossAoE
+    {
+        position: absolute; 
+        margin: 0; 
+        padding: 0; 
+        height: 50px;
+        border-width: 2px; 
+        border-style: solid;
+        transform-origin: 0%;
+        top: 390px; 
+        left: 490px;
+        transition: opacity 0.5s ease, width 0.5s ease;
+        border-color: #ff0000ea;
+        margin-top: -25px;
+        margin-left: 0px;
+        background: linear-gradient(to right, #ff000096, #ff770086);
+    }
+    
+
+    .tower
+    {
+        display: block; 
+        position: absolute;
+        opacity: 1;
+        transform-origin: 122px 0;
+    }
+
+    .tower.fadeOut
+    {
+        animation: fadeOut 1s ease-in-out forwards;
+    }
+</style>
+
+<script>
+//Set globals
+var role = 0;		//0 = MT, 1 = OT, 2 = H1, 3 = H2, 4 = M1, 5 = M2, 6 = R1, 7 = R2
+var stage = -1;		
+// Stages:
+// 0 = initial arena split lineup (RTMH true north on each side for hector, or HTMR l/r boss-relative for kindred)
+// 1 = first tower set (choose which tower to go to and which direction to be flung)
+// 2 = prey marker baits (non-tethers go in)
+// 3-5 = puddle baits (3 = first puddle, 4 = second puddle, 5 = third puddle)
+// 6 = tethers and markers resolve spots (inner/outer corner matters here)
+// 7 = second tower set
+// 8 = second prey marker baits
+// 9-11 = second puddle baits (9 = first puddle, 10 = second puddle, 11 = third puddle)
+// 12 = final tethers and markers resolve spots
+var arenaCleave = 0; //0 = West side, 1 = East side
+var killed = false;    //is the player dead?
+var win = 0;
+var lose = 0;
+var inOut = 0;
+var outer = false; //False = inner corners, True = outer corners
+var wPortals = [];
+var ePortals = [];
+var portalSet = 1; //1 or 2
+var portalSet1Coords = [{left: 40, top: 65}, {left: 890, top: 215}, {left: 890, top: 358}, {left: 40, top: 508}];
+var portalSet2Coords = [{left: 890, top: 65}, {left: 40, top: 215}, {left: 40, top: 358}, {left: 890, top: 508}];
+var tetheredPlayers1 = [];
+var tetheredPlayers2 = []; // should always be the complement of tetheredPlayers1
+var startingPlayerCoords = [{left: 326, top: 237}, {left: 553, top: 237}, {left: 326, top: 341}, {left: 553, top: 341}, {left: 326, top: 289}, {left: 553, top: 289}, {left: 326, top: 185}, {left: 553, top: 185}];
+var NWplayers = []; // players on northwest platform
+var NEplayers = []; // players on northeast platform
+var SWplayers = []; // players on southwest platform
+var SEplayers = []; // players on southeast platform
+var towerAssignments = []; // to be filled in based on player platform and tether status
+var baitAssignments = []; // to be filled in based on player platform and tether status
+var finalAssignments = []; // to be filled in based on player platform and tether status, as well as (later) inner/outer corners toggle
+var failBgColor = "#FF99CC";
+var failColor = "#660033";
+var passBgColor = "#AAFFAA";
+var passColor = "#006600";
+var noteBgColor = "#AAAAFF";
+var noteColor = "#000066";
+</script>
+
+</head>
+<body>
+<!-- title bar -->
+ <div class="titleBar">
+    <div class="scoreCount" style="float: left; background-color: #CCFFCC; color: #009900;">
+		<h1>WINS</h1>
+		<h2 id="winText">0</h2>
+	</div>
+	<div class="scoreCount" style="float: right; background-color: #FFCCCC; color: #990000;">
+		<h1>WIPES</h1>
+		<h2 id="loseText">0</h2>
+	</div>
+	<h1>Quiz time</h1>
+	<h2>M11S - Arena Split</h2>
+ </div> <!-- end title bar -->
+
+
+ <div class = "quizContent">
+    <p>Arena split description here</p>
+    <p id="status" class="alert">DEBUG.  This text shouldn't ever be visible</p>
+
+    <div class = "quizBlock">
+        <!-- Arena png-->
+        <img src="img/arena_blank.png" alt="M11S Arena" style="width:931px;height:578px;">
+
+        <!-- Boss -->
+        <img src="img/boss.png" alt="Boss" id="boss" style="top: 182px; left: 378px;">
+
+        <!-- Outer corner waymarks-->
+        <img src="img/way_1.png" alt="Waymark 1" id="way1" class="waymark" style="top: 100px; left: 200px;">
+        <img src="img/way_2.png" alt="Waymark 2" id="way2" class="waymark" style="top: 100px; left: 680px;">
+        <img src="img/way_3.png" alt="Waymark 3" id="way3" class="waymark" style="top: 430px; left: 200px;">
+        <img src="img/way_4.png" alt="Waymark 4" id="way4" class="waymark" style="top: 430px; left: 680px;">
+
+        <!-- Portals -->
+        <img src="img/portals_1.png" alt="Portal Pattern 1" id="portals1">
+        <img src="img/portals_2.png" alt="Portal Pattern 2" id="portals2">
+
+        <!-- Towers -->
+        <img src="img/towers.png" class="tower" id="towers" style="display: none">
+
+        <!-- Arena cleaves and Telegraphs-->
+        <img src="img/west_cleaves.png" alt="Arena Cleave West" id="arenaCleaveWest" class="aoeMarker">
+        <img src="img/west_cleaves_tg.png" alt="Arena Cleave West Telegraph" id="arenaCleaveWestTG" class="aoeTelegraph">
+        <img src="img/east_cleaves.png" alt="Arena Cleave East" id="arenaCleaveEast" class="aoeMarker">
+        <img src="img/east_cleaves_tg.png" alt="Arena Cleave East Telegraph" id="arenaCleaveEastTG" class="aoeTelegraph">
+
+        <!-- Puddles -->
+        <img src="img/puddles_1.png" alt="Puddles 1" id="puddles1" class="aoeMarker" style="opacity: 1;">
+        <img src="img/puddles_2.png" alt="Puddles 2" id="puddles2" class="aoeMarker" style="opacity: 1;">
+        <img src="img/puddles_3.png" alt="Puddles 3" id="puddles3" class="aoeMarker" style="opacity: 1;">
+
+        <!-- Tethers -->
+        <div id="tether4" class="tether" style="width: 120px; transform: rotate(2deg);"></div>
+        <div id="tether3" class="tether" style="width: 70px; transform: rotate(355deg);"></div>
+        <div id="tether2" class="tether" style="width: 120px; transform: rotate(178deg);"></div>
+        <div id="tether1" class="tether" style="width: 70px; transform: rotate(185deg);"></div>
+
+        <!-- Party members-->
+        <img id="p0" src="img/mt.png" style="left: 326px; top: 237px;"/>
+        <img id="p1" src="img/ot.png" class="grayscale" style="left: 553px; top: 237px;"/>
+        <img id="p4" src="img/m1.png" class="grayscale" style="left: 326px; top: 289px;"/>
+        <img id="p5" src="img/m2.png" class="grayscale" style="left: 553px; top: 289px;"/>
+        <img id="p2" src="img/h1.png" class="grayscale" style="left: 326px; top: 341px;"/>
+        <img id="p3" src="img/h2.png" class="grayscale" style="left: 553px; top: 341px;"/>
+        <img id="p6" src="img/r1.png" class="grayscale" style="left: 326px; top: 185px;"/>
+        <img id="p7" src="img/r2.png" class="grayscale" style="left: 553px; top: 185px;"/>
+
+        
+        <!-- Tether line AoEs -->
+        <div id="tetherAoEs">
+            <div id="tetherAoE1" class="tetherAoE" style="width: 0px;"></div>
+            <div id="tetherAoE2" class="tetherAoE" style="width: 0px;"></div>
+            <div id="tetherAoE3" class="tetherAoE" style="width: 0px;"></div>
+            <div id="tetherAoE4" class="tetherAoE" style="width: 0px;"></div>
+        </div>
+
+        <!-- Boss AoEs (Prey marker lines)-->
+        <div id="bossAoEs">
+            <div id="bossAoE1" class="bossAoE" style="width: 0px;"></div>
+            <div id="bossAoE2" class="bossAoE" style="width: 0px;"></div>
+            <div id="bossAoE3" class="bossAoE" style="width: 0px;"></div>
+            <div id="bossAoE4" class="bossAoE" style="width: 0px;"></div>
+        </div>
+
+        <!-- Prey markers -->
+        <div id="preymarkers">
+            <img id="pm_1" src="img/lockon_red.png" style="width: 52px; height: 52px;"/>
+            <img id="pm_2" src="img/lockon_red.png" style="width: 52px; height: 52px;"/>
+            <img id="pm_3" src="img/lockon_red.png" style="top: 366px; left: 314px; width: 52px; height: 52px;"/>
+            <img id="pm_4" src="img/lockon_red.png" style="top: 366px; left: 581px; width: 52px; height: 52px;"/>
+        </div>
+
+        <!-- Target circles; these will be offset by -12 each direction for centering-->
+        <!-- 1st group: Towers-->
+        <div id="targets_1">
+            <!-- Northwest tower -->
+            <img id="t_T_NWR" src="img/target.png" style="top: 119px; left: 258px; cursor: pointer;" onclick="resolveTowers('NWR')"/> <!--NW Tower Right-->
+            <img id="t_T_NWD" src="img/target.png" style="top: 159px; left: 221px; cursor: pointer;" onclick="resolveTowers('NWD')"/> <!--NW Tower Down-->
+            <!-- Northeast tower -->
+            <img id="t_T_NEL" src="img/target.png" style="top: 119px; left: 651px; cursor: pointer;" onclick="resolveTowers('NEL')"/> <!--NE Tower Left-->
+            <img id="t_T_NED" src="img/target.png" style="top: 159px; left: 688px; cursor: pointer;" onclick="resolveTowers('NED')"/> <!--NE Tower Down-->
+            <!-- Southwest tower -->
+            <img id="t_T_SWR" src="img/target.png" style="top: 418px; left: 258px; cursor: pointer;" onclick="resolveTowers('SWR')"/> <!--SW Tower Right-->
+            <img id="t_T_SWU" src="img/target.png" style="top: 378px; left: 221px; cursor: pointer;" onclick="resolveTowers('SWU')"/> <!--SW Tower Up-->
+            <!-- Southeast tower -->
+            <img id="t_T_SEL" src="img/target.png" style="top: 418px; left: 651px; cursor: pointer;" onclick="resolveTowers('SEL')"/> <!--SE Tower Left-->
+            <img id="t_T_SEU" src="img/target.png" style="top: 378px; left: 688px; cursor: pointer;" onclick="resolveTowers('SEU')"/> <!--SE Tower Up-->
+        </div>
+
+        <!-- 2nd group: Prey baits -->
+        <div id="targets_2">
+            <!-- NW Out and in -->
+            <img id="t_P_NWO" src="img/target.png" style="top: 198px; left: 288px; cursor: pointer;" onclick="resolveBaits('NWO')"/> <!--NW Out-->
+            <img id="t_P_NWI" src="img/target.png" style="top: 250px; left: 339px; cursor: pointer;" onclick="resolveBaits('NWI')"/> <!--NW In (Bait)-->
+            <!-- NE Out and in -->
+            <img id="t_P_NEO" src="img/target.png" style="top: 198px; left: 618px; cursor: pointer;" onclick="resolveBaits('NEO')"/> <!--NE Out-->
+            <img id="t_P_NEI" src="img/target.png" style="top: 250px; left: 567px; cursor: pointer;" onclick="resolveBaits('NEI')"/> <!--NE In (Bait)-->
+            <!-- SW Out and in -->
+            <img id="t_P_SWO" src="img/target.png" style="top: 354px; left: 288px; cursor: pointer;" onclick="resolveBaits('SWO')"/> <!--SW Out-->
+            <img id="t_P_SWI" src="img/target.png" style="top: 302px; left: 339px; cursor: pointer;" onclick="resolveBaits('SWI')"/> <!--SW In (Bait)-->
+            <!-- SE Out and in -->
+            <img id="t_P_SEO" src="img/target.png" style="top: 354px; left: 618px; cursor: pointer;" onclick="resolveBaits('SEO')"/> <!--SE Out-->
+            <img id="t_P_SEI" src="img/target.png" style="top: 302px; left: 567px; cursor: pointer;" onclick="resolveBaits('SEI')"/> <!--SE In (Bait)-->
+        </div>
+
+        <!-- 2.5th group: Up/down arrows for puddles -->
+        <div id="arrows">
+            <img id="a_UP" src="img/uparrow.png" style="top: 179px; left: 430px; cursor: pointer;" onclick="resolveNorthSouth('N')"/> <!--Up Arrow-->
+            <img id="a_DN" src="img/downarrow.png" style="top: 314px; left: 430px; cursor: pointer;" onclick="resolveNorthSouth('S')"/> <!--Down Arrow-->
+        </div>
+        
+        <!-- 3rd group: Waymarks for tethers and prey-->
+        <div id="targets_3">
+            <!-- 1 waymark TODO: define functionality for these-->
+            <img id="t_W_1NWC" src="img/target.png" style="top: 88px; left: 188px; cursor: pointer;" onclick="resolveFinalSpots('1NWC')"/> <!--1 Marker NW Corner-->
+            <img id="t_W_1NEC" src="img/target.png" style="top: 88px; left: 236px; cursor: pointer;" onclick="resolveFinalSpots('1NEC')"/> <!--1 Marker NE Corner-->
+            <img id="t_W_1SWC" src="img/target.png" style="top: 136px; left: 188px; cursor: pointer;" onclick="resolveFinalSpots('1SWC')"/> <!--1 Marker SW Corner-->
+            <img id="t_W_1SEC" src="img/target.png" style="top: 136px; left: 236px; cursor: pointer;" onclick="resolveFinalSpots('1SEC')"/> <!--1 Marker SE Corner-->
+
+            <!-- NW Edge : these are same regardless of waymark sets-->
+            <img id="t_W_1NWE" src="img/target.png" style="top: 0px; left: 188px; cursor: pointer;" onclick="resolveFinalSpots('1NWE')"/> <!--1 Marker NW Edge-->
+            <img id="t_W_1NEE" src="img/target.png" style="top: 0px; left: 236px; cursor: pointer;" onclick="resolveFinalSpots('1NEE')"/> <!--1 Marker NE Edge-->
+
+            <!-- 2 waymark -->
+            <img id="t_W_2NWC" src="img/target.png" style="top: 88px; left: 668px; cursor: pointer;" onclick="resolveFinalSpots('2NWC')"/> <!--2 Marker NW Corner-->
+            <img id="t_W_2NEC" src="img/target.png" style="top: 88px; left: 716px; cursor: pointer;" onclick="resolveFinalSpots('2NEC')"/> <!--2 Marker NE Corner-->
+            <img id="t_W_2SWC" src="img/target.png" style="top: 136px; left: 668px; cursor: pointer;" onclick="resolveFinalSpots('2SWC')"/> <!--2 Marker SW Corner-->
+            <img id="t_W_2SEC" src="img/target.png" style="top: 136px; left: 716px; cursor: pointer;" onclick="resolveFinalSpots('2SEC')"/> <!--2 Marker SE Corner-->
+
+            <!-- NE Edge : these are same regardless of waymark sets-->
+            <img id="t_W_2NWE" src="img/target.png" style="top: 0px; left: 668px; cursor: pointer;" onclick="resolveFinalSpots('2NWE')"/> <!--2 Marker NW Edge-->
+            <img id="t_W_2NEE" src="img/target.png" style="top: 0px; left: 716px; cursor: pointer;" onclick="resolveFinalSpots('2NEE')"/> <!--2 Marker NE Edge-->
+
+            <!-- 3 waymark -->
+            <img id="t_W_3NWC" src="img/target.png" style="top: 418px; left: 188px; cursor: pointer;" onclick="resolveFinalSpots('3NWC')"/> <!--3 Marker NW Corner-->
+            <img id="t_W_3NEC" src="img/target.png" style="top: 418px; left: 236px; cursor: pointer;" onclick="resolveFinalSpots('3NEC')"/> <!--3 Marker NE Corner-->
+            <img id="t_W_3SWC" src="img/target.png" style="top: 466px; left: 188px; cursor: pointer;" onclick="resolveFinalSpots('3SWC')"/> <!--3 Marker SW Corner-->
+            <img id="t_W_3SEC" src="img/target.png" style="top: 466px; left: 236px; cursor: pointer;" onclick="resolveFinalSpots('3SEC')"/> <!--3 Marker SE Corner-->
+
+            <!-- SE Edge : these are same regardless of waymark sets-->
+            <img id="t_W_3SWE" src="img/target.png" style="top: 554px; left: 188px; cursor: pointer;" onclick="resolveFinalSpots('3SWE')"/> <!--3 Marker SW Edge-->
+            <img id="t_W_3SEE" src="img/target.png" style="top: 554px; left: 236px; cursor: pointer;" onclick="resolveFinalSpots('3SEE')"/> <!--3 Marker SE Edge-->
+
+            <!-- 4 waymark -->
+            <img id="t_W_4NWC" src="img/target.png" style="top: 418px; left: 668px; cursor: pointer;" onclick="resolveFinalSpots('4NWC')"/> <!--4 Marker NW Corner-->
+            <img id="t_W_4NEC" src="img/target.png" style="top: 418px; left: 716px; cursor: pointer;" onclick="resolveFinalSpots('4NEC')"/> <!--4 Marker NE Corner-->
+            <img id="t_W_4SWC" src="img/target.png" style="top: 466px; left: 668px; cursor: pointer;" onclick="resolveFinalSpots('4SWC')"/> <!--4 Marker SW Corner-->
+            <img id="t_W_4SEC" src="img/target.png" style="top: 466px; left: 716px; cursor: pointer;" onclick="resolveFinalSpots('4SEC')"/> <!--4 Marker SE Corner-->
+
+            <!-- SE Edge : these are same regardless of waymark sets-->
+            <img id="t_W_4SWE" src="img/target.png" style="top: 554px; left: 668px; cursor: pointer;" onclick="resolveFinalSpots('4SWE')"/> <!--4 Marker SW Edge-->
+            <img id="t_W_4SEE" src="img/target.png" style="top: 554px; left: 716px; cursor: pointer;" onclick="resolveFinalSpots('4SEE')"/> <!--4 Marker SE Edge-->
+        </div>
+
+        <!-- Menu buttons -->
+        <img id="resetImg" style="right: 60px; top: 10px; border-radius: 5px; cursor: pointer; filter: grayscale(0%)" src="img/reset.png" onclick="setupBoard()"/>
+        <img id="roleImg" style="left: 10px; top: 10px; border-radius: 5px; cursor: pointer;" src="img/iconmt.png" onclick="changeRole()"/>
+        <img id="nextImg" style="left: 396px; top: 375px; cursor: pointer; display: none;" src="img/next.png" onclick=""/>
+    </div>
+ </div>
+</body>
+
+<script>
+    //Setup/reset board
+    function setupBoard()
+    {
+        step = 0;
+        killed = false;
+        setText("winText", win);
+        setText("loseText", lose);
+
+        // reset player positions
+        resetPlayerPositions();
+        resetTethers();
+
+        // hide mechanics
+        hideImage("arenaCleaveWest");
+        hideImage("arenaCleaveWestTG");
+        hideImage("arenaCleaveEast");
+        hideImage("arenaCleaveEastTG");
+
+        hideImage("puddles1");
+        hideImage("puddles2");
+        hideImage("puddles3");
+
+        hideGroup("targets_1");
+        hideGroup("targets_2");
+        hideGroup("targets_3");
+        hideGroup("arrows");
+        hideGroup("preymarkers");
+
+        hideGroup("tetherAoEs");
+        hideGroup("bossAoEs");
+
+        // reset next button
+        var nextButton = document.getElementById("nextImg");
+        nextButton.style.display = "none";
+        nextButton.onclick = null;
+        
+
+        // reset text
+        setBgAndColor("status", "", "");
+        setText("status", "Mechanic reset.  Good luck!");
+
+        // assign default platform positions for players
+        NWplayers = [0, 6]; // MT, R1
+        NEplayers = [1, 7]; // OT, R2
+        SWplayers = [2, 4]; // H1, M1
+        SEplayers = [3, 5]; // H2, M2
+
+        assignRandomTethers();
+        assignPlayerTowers();
+        //debug, show the tower assignemtns as text
+        //setText("status", "Tower assignments: " + towerAssignments.join(", "));
+        showGroup("targets_1");
+        showImage("towers");
+
+        // Choose a random arena cleave side
+        arenaCleave = Math.floor(Math.random() * 2); //0 or 1
+        if(arenaCleave == 0)
+        {
+            showImage("arenaCleaveWestTG");
+            hideImage("arenaCleaveEastTG");
+        }
+        else
+        {
+            showImage("arenaCleaveEastTG");
+            hideImage("arenaCleaveWestTG");
+        }
+
+        assignPlayerTowers()
+    }
+
+    function changeRole()
+    {
+        switch(role)
+        {
+            case 0: //MT
+                role = 1;
+                changeImage("roleImg", "img/iconot.png");
+                document.getElementById("p1").classList.remove("grayscale");
+                document.getElementById("p0").classList.add("grayscale");
+                break;
+            case 1: //OT
+                role = 2;
+                changeImage("roleImg", "img/iconh1.png");
+                document.getElementById("p2").classList.remove("grayscale");
+                document.getElementById("p1").classList.add("grayscale");
+                break;
+            case 2: //H1
+                role = 3;
+                changeImage("roleImg", "img/iconh2.png");
+                document.getElementById("p3").classList.remove("grayscale");
+                document.getElementById("p2").classList.add("grayscale");
+                break;
+            case 3: //H2
+                role = 4;
+                changeImage("roleImg", "img/iconm1.png");
+                document.getElementById("p4").classList.remove("grayscale");
+                document.getElementById("p3").classList.add("grayscale");
+                break;
+            case 4: //M1
+                role = 5;
+                changeImage("roleImg", "img/iconm2.png");
+                document.getElementById("p5").classList.remove("grayscale");
+                document.getElementById("p4").classList.add("grayscale");
+                break;
+            case 5: //M2
+                role = 6;
+                changeImage("roleImg", "img/iconr1.png");
+                document.getElementById("p6").classList.remove("grayscale");
+                document.getElementById("p5").classList.add("grayscale");
+                break;
+            case 6: //R1
+                role = 7;
+                changeImage("roleImg", "img/iconr2.png");
+                document.getElementById("p7").classList.remove("grayscale");
+                document.getElementById("p6").classList.add("grayscale");
+                break;
+            case 7: //R2
+                role = 0;
+                changeImage("roleImg", "img/iconmt.png");
+                document.getElementById("p0").classList.remove("grayscale");
+                document.getElementById("p7").classList.add("grayscale");
+                break;
+        }
+        setupBoard(); //Reset the sim
+    }
+
+    function resetPlayerPositions()
+    {
+        for(var i = 0; i < 8; i++)
+        {
+            var playerImg = document.getElementById("p" + i);
+            playerImg.style.left = startingPlayerCoords[i].left + "px";
+            playerImg.style.top = startingPlayerCoords[i].top + "px";
+        }
+    }
+
+    function resetTethers()
+    {
+        for(var i = 1; i <=4; i++)
+        {
+            var tetherDiv = document.getElementById("tether" + i);
+            tetherDiv.style.width = "0px";
+            tetherDiv.style.left = "490px";
+            tetherDiv.style.top = "390px";
+            tetherDiv.style.transform = "rotate(0deg)";
+        }
+    }
+
+    function assignRandomTethers()
+    {
+        // We need to do a few things:
+        // 1: Determine which set of portals to use, 1 or 2.
+        // 2: Choose 4 players to receive tethers.
+        // 3: Assign tethers to those players based on the portal set chosen.
+        //    This is done by drawing a line from each portal to the center of each chosen player.
+
+        portalSet = Math.floor(Math.random() * 2) + 1; //1 or 2
+        if(portalSet == 1)
+        {
+            showImage("portals1");
+            hideImage("portals2");
+        }
+        else
+        {
+            showImage("portals2");
+            hideImage("portals1");
+        }
+
+        // Choose 4 unique players to receive tethers 2 must be G1 (0,2,4,6) and 2 must be G2 (1,3,5,7)
+        tetheredPlayers1 = []; // Reset
+        while(tetheredPlayers1.length < 2) // ensure 2 from G1
+        {
+            var candidate = Math.floor(Math.random() * 4) * 2; //0,2,4,6
+            if(!tetheredPlayers1.includes(candidate))
+            {
+                tetheredPlayers1.push(candidate);
+            }
+        }
+        while(tetheredPlayers1.length < 4) // other 2 from G2
+        {
+            var candidate = Math.floor(Math.random() * 4) * 2 + 1; //1,3,5,7
+            if(!tetheredPlayers1.includes(candidate))
+            {
+                tetheredPlayers1.push(candidate);
+            }
+        }
+        // add the rest to tetheredPlayers2
+        tetheredPlayers2 = [];
+        for(var i = 0; i < 8; i++)
+        {
+            if(!tetheredPlayers1.includes(i))
+            {
+                tetheredPlayers2.push(i);
+            }
+        }
+
+        // Based on the portal set and players, draw tethers of variable lengths and angles
+        var portalCoords;
+        for(var i = 0; i < 4; i++)
+        {
+            // Portal set 1 order:
+            // 1 = NW Corner, 2 = NE middle, 3 = SE middle, 4 = SW corner
+            // Portal set 2 order:
+            // 1 = NE Corner, 2 = NW middle, 3 = SW middle, 4 = SE corner
+            if(portalSet == 1)
+            {
+                portalCoords = portalSet1Coords[i];
+            }
+            else
+            {
+                portalCoords = portalSet2Coords[i];
+            }
+
+            drawTetherFromPortalToPlayer(portalCoords, tetheredPlayers1[i], i + 1);
+        }
+        // debug: show tethered players as text
+        /*if(portalSet == 1)
+        {
+            setText("status", "Portal set 1, NW " + tetheredPlayers1[0] + ", NE " + tetheredPlayers1[1] + ", SE " + tetheredPlayers1[2] + ", SW " + tetheredPlayers1[3]);
+        }
+        else
+        {
+            setText("status", "Portal set 2, NE " + tetheredPlayers1[0] + ", NW " + tetheredPlayers1[1] + ", SW " + tetheredPlayers1[2] + ", SE " + tetheredPlayers1[3]);
+        }*/
+    }
+
+    function redrawTethers()
+    {
+        var portalCoords;
+        for(var i = 0; i < 4; i++)
+        {
+            // Portal set 1 order:
+            // 1 = NW Corner, 2 = NE middle, 3 = SE middle, 4 = SW corner
+            // Portal set 2 order:
+            // 1 = NE Corner, 2 = NW middle, 3 = SW middle, 4 = SE corner
+            if(portalSet == 1)
+            {
+                portalCoords = portalSet1Coords[i];
+            }
+            else
+            {
+                portalCoords = portalSet2Coords[i];
+            }
+
+            drawTetherFromPortalToPlayer(portalCoords, tetheredPlayers1[i], i + 1);
+        }
+    }
+
+    function drawTetherFromPortalToPlayer(portalCoords, playerID, tetherID)
+    {
+        var playerImg = document.getElementById("p" + playerID);
+        
+        // Get player center using inline styles (which are relative to quiz block)
+        var playerCenterX = parseFloat(playerImg.style.left) + playerImg.width / 2;
+        var playerCenterY = parseFloat(playerImg.style.top) + playerImg.height / 2;
+
+        // Calculate differences from portal to player
+        var deltaX = playerCenterX - portalCoords.left;
+        var deltaY = playerCenterY - portalCoords.top;
+
+        // Calculate distance and angle
+        var distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        var angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+
+        // Normalize angle to 0-360 range
+        var normalizedAngle = angle % 360; // Ensure angle is within 0-360
+        
+        // Choose rotation direction (CW or CCW) based on which is closer
+        var rotationAngle = normalizedAngle > 180 ? normalizedAngle - 360 : normalizedAngle;
+
+        // Adjust rotation direction to ensure the shorter path is taken
+        if (rotationAngle < -180) {
+            rotationAngle += 360;
+        } else if (rotationAngle > 180) {
+            rotationAngle -= 360;
+        }
+
+        // Set tether properties
+        var tetherDiv = document.getElementById("tether" + tetherID);
+        tetherDiv.style.left = portalCoords.left + "px";
+        tetherDiv.style.top = portalCoords.top + "px";
+        tetherDiv.style.width = distance + "px";
+        tetherDiv.style.transform = "rotate(" + rotationAngle + "deg)";
+        }
+
+    function resolveTowers(choice)
+    {  
+            if(towerAssignments.length == 0)
+            {
+                assignPlayerTowers();
+            }
+            // move all players
+            for(var i = 0; i < 8; i++)
+            {
+                if(i != role)
+                {   
+                    moveCharToTarget('p'+i, 't_T_'+ towerAssignments[i]);
+                }
+                else
+                {
+                    // current player
+                    moveCharToTarget('p'+role, 't_T_'+ choice);
+                }
+            }
+            redrawTethers();
+            //NW tower: OK only if player is on NW platform and tethered to a W portal, or is NW and has no tether
+
+            if(towerAssignments[role] === choice)
+            {
+                // set success state
+                setText("status", "<strong>[Success!]</strong> - Correct tower.");
+            }
+            else
+            {
+                setBgAndColor("status", failBgColor, failColor);
+                setText("status", "<strong>[FAIL]</strong> - Incorrect tower.");
+                
+
+                if(towerAssignments[role].substring(0,2) === choice.substring(0,2))
+                {
+                    // correct tower, wrong direction
+                    setText("status", "<strong>[FAIL]</strong> - Incorrect fling direction.");
+                }
+
+                if(towerAssignments[role].substring(1,2) !== choice.substring(1,2))
+                {
+                    // wrong side
+                    setText("status", "<strong>[FAIL]</strong> - You fell down!.");
+                }
+
+                towerAssignments[role] = choice; // for showing where they went
+                killed = 1;
+                lose++;
+            }
+            // fade out towers
+            hideAndFadeImage("towers");
+            // proceed to fling players after a short delay
+            disableResetButton();
+            setTimeout(flingPlayers,1000);
+            // hide tower targets
+            hideGroup("targets_1");
+            setTimeout(function() { showGroup("targets_2"); }, 1250);
+            setTimeout(enableResetButton, 1250);
+
+            // for the next step, re-assign corners based on fling
+            // these aren't perfectly specific; we just need E/W splits
+            NWplayers = [];
+            NEplayers = [];
+            SWplayers = [];
+            SEplayers = []; // reset
+            for(var i = 0; i < 8; i++)
+            {
+                switch(towerAssignments[i])
+                {
+                    // cases where the player ends up on the west platform
+                    case 'NWD':
+                    case 'SWU':
+                    case 'NEL':
+                    case 'SEL':
+                        if(i % 2 == 0)
+                        {
+                            NWplayers.push(i);
+                        }
+                        else
+                        {
+                            SWplayers.push(i);
+                        }
+                        break;
+                    // cases where the player ends up on the east platform
+                    default:
+                        if(i % 2 == 0)
+                        {
+                            NEplayers.push(i);
+                        }
+                        else
+                        {
+                            SEplayers.push(i);
+                        }
+                        break;
+                }
+            }
+
+            //debug : show E/W assignments as text
+            //setText("status", "W side: " + NWplayers.concat(SWplayers).join(", ") + " | E side: " + NEplayers.concat(SEplayers).join(", "));
+            //debug: show tether assignments
+            //setText("status", "Tethered players: " + tetheredPlayers1.join(", "));
+
+        } // end resolveTowers
+
+    function assignPlayerTowers()
+        {
+            // Assign each player to a tower based on the folllowing factors:
+            // 1: Their starting platform (NW, NE, SW, SE)
+            // 2: Their tether status (tethered to W portal, tethered to E portal, no tether)
+            // Th index of towerAssignmnents corresponds to player ID. (0-7)
+            // The value at each index corresponds to the tower assigned.
+            towerAssignments = []; // Reset
+            
+            if(portalSet == 1)
+            {
+                wPortals = [0, 3]; // NW corner, SW corner
+                ePortals = [1, 2]; // NE middle, SE middle
+            }
+            else
+            {
+                wPortals = [1, 2]; // NW middle, SW middle
+                ePortals = [0, 3]; // SE corner, NE corner
+            }
+
+            for(var i = 0; i < 8; i++)
+            {
+                var assignedTower = '';
+                // Determine player's platform
+                if(NWplayers.includes(i))
+                {
+                    // Player is on NW platform
+                    if(tetheredPlayers1.includes(i))
+                    {
+                        // Check if this tether is west
+                        if(wPortals.includes(tetheredPlayers1.indexOf(i)))
+                        {
+                            // Player has tether to W portal
+                            assignedTower = 'NWR'; // NW tower, right fling
+                        }
+                        else
+                        {
+                            // Player has tether to E portal
+                            assignedTower = 'NWD'; // NW tower, down fling
+                        }
+                    }
+                    else
+                    {
+                        // no tether (stay)
+                        assignedTower = 'NWD'; // NW tower, down fling
+                    }
+                }
+                else if(NEplayers.includes(i))
+                {
+                    // Player is on NE platform
+                    if(tetheredPlayers1.includes(i))
+                    {
+                        // Check if this tether is east
+                        if(ePortals.includes(tetheredPlayers1.indexOf(i)))
+                        {
+                            // Player has tether to E portal (swap)
+                            assignedTower = 'NEL'; // NE tower, left fling
+                        }
+                        else
+                        {
+                            // Player has tether to W portal (stay)
+                            assignedTower = 'NED'; // NE tower, down fling
+                        }
+                    }
+                    else
+                    {
+                        // no tether (stay)
+                        assignedTower = 'NED'; // NE tower, down fling
+                    }
+                }
+                else if(SWplayers.includes(i))
+                {
+                    // Player is on SW platform
+                    if(tetheredPlayers1.includes(i))
+                    {
+                        // Check if this tether is west
+                        if(wPortals.includes(tetheredPlayers1.indexOf(i)))
+                        {
+                            // Player has tether to W portal (swap)
+                            assignedTower = 'SWR'; // SW tower, right fling
+                        }
+                        else
+                        {
+                            // Player has tether to E portal (stay)
+                            assignedTower = 'SWU'; // SW tower, up fling
+                        }
+                    }
+                    else
+                    {
+                        // no tether (stay)
+                        assignedTower = 'SWU'; // SW tower, up fling
+                    }
+                }
+                else if(SEplayers.includes(i))
+                {
+                    // Player is on SE platform
+                    if(tetheredPlayers1.includes(i))
+                    {
+                        // Check if this tether is east
+                        if(ePortals.includes(tetheredPlayers1.indexOf(i)))
+                        {
+                            // Player has tether to E portal (swap)
+                            assignedTower = 'SEL'; // SE tower, left fling
+                        }
+                        else
+                        {
+                            // Player has tether to W portal (stay)
+                            assignedTower = 'SEU'; // SE tower, up fling
+                        }
+                    }
+                    else
+                    {
+                        // no tether (stay)
+                        assignedTower = 'SEU'; // SE tower, up fling
+                    }
+                }
+                towerAssignments.push(assignedTower);
+            }            
+        }
+
+    function flingPlayers()
+        {
+            var overlap = [0,0,0,0,0,0,0,0]; // to track overlapping players for offsetting
+            // Fling all players according to their tower assignments
+            for(var i = 0; i < 8; i++)
+            {
+                switch(towerAssignments[i])
+                {
+                    case 'NWR':
+                        moveTargetToCoords('p'+i, 700, 128+overlap[0]);
+                        overlap[0]+=25;
+                        break;
+                    case 'NWD':
+                        moveTargetToCoords('p'+i, 231, 287+overlap[1]);
+                        overlap[1]+=25;
+                        break;
+                    case 'NEL':
+                        moveTargetToCoords('p'+i, 231, 128+overlap[2]);
+                        overlap[2]+=25;
+                        break;
+                    case 'NED':
+                        moveTargetToCoords('p'+i, 700, 287+overlap[3]);
+                        overlap[3]+=25;
+                        break;
+                    case 'SWR':
+                        moveTargetToCoords('p'+i, 700, 430+overlap[4]);
+                        overlap[4]+=25;
+                        break;
+                    case 'SWU':
+                        moveTargetToCoords('p'+i, 231, 371+overlap[5]);
+                        overlap[5]+=25;
+                        break;
+                    case 'SEL':
+                        moveTargetToCoords('p'+i, 231, 430+overlap[6]);
+                        overlap[6]+=25;
+                        break;
+                    case 'SEU':
+                        moveTargetToCoords('p'+i, 700, 371+overlap[7]);
+                        overlap[7]+=25;
+                        break;
+                }
+            }
+            redrawTethers();
+        }
+
+    function resolveBaits(choice)
+        {
+            
+            // the only thing we really care about on this step is whether the non-tethered players went in or out,
+            // as well as whether it's on the correct platform.
+            // first verify east/west
+            assignPlayerBaits(); // assign bait assignments based on current positions
+            var baitAssignment = baitAssignments[role]; // e.g. NWI
+            var baitPlayers = []; // players who are baiting
+            var baitPartner = -1;
+            // find bait partner; only applicable if non-tethered
+            // the other player should be xWI or xEI on the same side, just flip the first letter
+            if(!tetheredPlayers1.includes(role))
+            {
+            for(var i = 0; i < 8; i++)
+            {
+                if(i != role && baitAssignments[i].substring(1,3) === baitAssignment.substring(1,3))
+                {
+                    // same side
+                    if(!tetheredPlayers1.includes(i))
+                    {
+                        // both non-tethered
+                        if(baitAssignments[i].substring(0,1) !== baitAssignment.substring(0,1))
+                        {
+                            // opposite north/south
+                            baitPartner = i;
+                        }
+                    }
+                }
+            }
+            }
+
+            if(baitAssignment === choice)
+            {
+                // set success state
+                setText("status", "<strong>[Success!]</strong> - Prey markers have been correctly baited and tethers are headed in the correct directions!.");
+            }
+            // if it's in, north or south is fine, as long as on correct side
+            else if(baitAssignment.substring(1,3) === choice.substring(1,3) && choice.endsWith('I'))
+            {
+                // set success state
+                setText("status", "<strong>[Success!]</strong> - Correct prey marker bait! The other player adjusted for you, too.");
+                var temp = baitAssignments[baitPartner];
+                baitAssignments[baitPartner] = baitAssignments[role];
+                baitAssignments[role] = temp; // swap for showing where they went
+                //also change their presence in the NW/NE/SW/SE arrays
+            }
+            else
+            {
+                setBgAndColor("status", failBgColor, failColor);
+                setText("status", "<strong>[FAIL]</strong> - Incorrect bait.");
+
+                if(baitAssignment.substring(1,2) !== choice.substring(1,2)) // E/W discrepancy
+                {
+                    // wrong side
+                    setText("status", "<strong>[FAIL]</strong> - You fell down!.");
+                }
+                
+                if(baitAssignment.substring(0,1) !== choice.substring(0,1) && choice.endsWith('O'))
+                {
+                    // wrong N/S for out
+                    setText("status", "<strong>[FAIL]</strong> - You went the wrong way! You can still adjust, but you risk confusing other tethered players.");
+                }
+
+                if(tetheredPlayers1.includes(role) && choice.endsWith('I'))
+                {
+                    // tethered going in
+                    setText("status", "<strong>[FAIL]</strong> - Tethered players must stay out or they will bait a prey marker!");
+                    // set player as a prey marker
+                    baitPlayers.push(role);
+                }
+                else if(baitAssignment.substring(2,3) !== choice.substring(2,3))
+                {
+                    // wrong in/out
+                    if(!tetheredPlayers1.includes(role))
+                    {
+                        // non-tethered going out
+                        setText("status", "<strong>[FAIL]</strong> - Non-tethered players must go in, or they risk missing their bait!");
+                        var otherPlayer = baitAssignments.indexOf(choice); // find who went to the same spot
+                        baitPlayers.push(otherPlayer); // give that other player the prey marker
+                    }
+                }
+
+                baitAssignments[role] = choice; // for showing where they went
+                killed = 1;
+                lose++;
+            }
+            
+            // update NW/NE/SW/SE arrays based on bait assignments
+            NWplayers = [];
+            NEplayers = [];
+            SWplayers = [];
+            SEplayers = []; // reset
+            for(var i = 0; i < 8; i++)
+            {
+                switch(baitAssignments[i])
+                {
+                    case 'NWO':
+                        NWplayers[0] = i;
+                        break;
+                    case 'NWI':
+                        NWplayers[1] = i;
+                        break;
+                    case 'NEO':
+                        NEplayers[0] = i;
+                        break;
+                    case 'NEI':
+                        NEplayers[1] = i;
+                        break;
+                    case 'SWO':
+                        SWplayers[0] = i;
+                        break;
+                    case 'SWI':
+                        SWplayers[1] = i;
+                        break;
+                    case 'SEO':
+                        SEplayers[0] = i;
+                        break;
+                    case 'SEI':
+                        SEplayers[1] = i;
+                        break;
+                }
+            }
+
+            //debug : show E/W assignments as text
+            //setText("status", "Bait assignments: " + baitAssignments.join(", ") + " | W side: " + NWplayers.concat(SWplayers).join(", ") + " | E side: " + NEplayers.concat(SEplayers).join(", "));
+            // move all players
+            for(var i = 0; i < 8; i++)
+            {
+                if(i != role)
+                {   
+                    moveCharToTarget('p'+i, 't_P_'+ baitAssignments[i]);
+                }
+                else
+                {
+                    // current player
+                    moveCharToTarget('p'+role, 't_P_'+ choice);
+                }
+            }
+            redrawTethers();
+
+            // darw prey markers on the players who are baiting
+            // if the player makes an incorrect choice, there should be 2 people in the same spot. find out what this spot is and draw the marker there
+            if(!killed)
+            {
+                for(var i = 0; i < 8; i++)
+                {
+                    if(baitAssignments[i].endsWith('I'))
+                    {
+                        baitPlayers.push(i);
+                    }
+                }
+            }
+            else
+            {
+                // populate baitPlayers with the other 3 players who are correctly receiving baits
+                for(var i = 0; i < 8; i++)
+                {
+                    if(baitAssignments[i].endsWith('I') && !baitPlayers.includes(i))
+                    {
+                        baitPlayers.push(i);
+                    }
+                }
+            }
+            // markers will be shown after players move
+            // show arrows and prepare for puddle animation stage
+            hideGroup("targets_2"); 
+            showGroup("arrows");
+            setTimeout(function() { showAndFadeGroup("preymarkers"); drawMarkersOnPlayers(baitPlayers); }, 500);
+        } // end resolveBaits
+
+    function assignPlayerBaits()
+    {
+        // Bait factors:
+        // 1. Player has to be on the correct platform (east/west)
+        // 2. Tethered players must go out, non-tethered players must go in
+        // 2.5 A non-tethered player may go north or south, with their partner going the opposite way
+        // 3. Tethered players must go to the side that allows their tether to stretch
+
+        baitAssignments = []; // Reset
+        var westPlayers = NWplayers.concat(SWplayers);
+        var eastPlayers = NEplayers.concat(SEplayers);
+
+        // tetheredPlayers1 contains the players with tethers. the order ensures that indices 0, 1 have the northernmost tethers (stretch south)
+        var northSouthID = '';
+        var eastWestID = ''; // added 2nd
+        var inOutID = '';
+        for(var i = 0; i < 8; i++)
+        {
+            westPlayers.includes(i)? eastWestID = 'W' : eastWestID = 'E';
+            if(tetheredPlayers1.includes(i))
+            {
+                inOutID = 'O'; // tethered must go out
+                if(tetheredPlayers1.indexOf(i) < 2) // northernmost tethers must stretch south
+                {
+                    northSouthID = 'S';
+                }
+                else
+                {
+                    northSouthID = 'N';
+                }
+            }
+            else
+            {
+                // non-tethered players can go either way; assign arbitrarily but do NOT overlap
+                inOutID = 'I'; // non-tethered must go in
+                if(baitAssignments.includes('N' + eastWestID + inOutID))
+                {
+                    northSouthID = 'S';
+                }
+                else
+                {
+                    northSouthID = 'N';
+                }
+            }
+            baitAssignments.push(northSouthID + eastWestID + inOutID);
+        }
+
+        setText("status", "Bait assignments: " + baitAssignments.join(", "));
+
+
+    }
+
+    function resolveNorthSouth(choice)
+    {
+        // only thing that matters is whether the player chose north or south correctly
+        var nsAssignment = '';
+        if(NWplayers.includes(role) || NEplayers.includes(role))
+        {
+            nsAssignment = 'N';
+        }
+        else
+        {
+            nsAssignment = 'S';
+        }
+
+        if(nsAssignment === choice)
+        {
+            // set success state
+            setText("status", "<strong>[Success!]</strong> - Correct north/south choice. Now bait your 3 puddles...");
+            hideGroup("arrows");
+            animatePuddles();
+        }
+        else
+        {
+            setBgAndColor("status", failBgColor, failColor);
+            setText("status", "<strong>[FAIL]</strong> - Incorrect north/south choice! You may still recover, but you risk confusing other players or not making it to your side in time!");
+            killed = 1;
+            lose++;
+            hideGroup("arrows");
+        }
+    }
+
+    function animatePuddles()
+    {
+        // disable the reset button during the animation
+        disableResetButton();
+        // 1. bring each player in NW/NE/SW/SEplayers closer to center, stacked on one another
+        //NW
+        moveTargetToCoords('p'+NWplayers[0], 342, 263);
+        moveTargetToCoords('p'+NWplayers[1], 352, 273);
+        //NE
+        moveTargetToCoords('p'+NEplayers[0], 599, 263);
+        moveTargetToCoords('p'+NEplayers[1], 589, 273);
+        //SW
+        moveTargetToCoords('p'+SWplayers[0], 352, 305);
+        moveTargetToCoords('p'+SWplayers[1], 342, 315);
+        //SE
+        moveTargetToCoords('p'+SEplayers[0], 589, 305);
+        moveTargetToCoords('p'+SEplayers[1], 599, 315);
+        redrawTethers();
+        drawMarkersOnPlayers(tetheredPlayers2); // show prey markers on non-tethered players
+
+        // 2. wait for a moment and show 1st puddle set; animate fade in later with CSS
+        setTimeout(function(){
+            showAndFadeImage("puddles1");
+        }, 500);
+
+        // 2. wait and then move players up and down by 100 pixels each
+        setTimeout(function(){
+            //NW
+            moveTargetToCoords('p'+NWplayers[0], 342, 163);
+            moveTargetToCoords('p'+NWplayers[1], 352, 173);
+            //NE
+            moveTargetToCoords('p'+NEplayers[0], 599, 163);
+            moveTargetToCoords('p'+NEplayers[1], 589, 173);
+            //SW
+            moveTargetToCoords('p'+SWplayers[0], 352, 405);
+            moveTargetToCoords('p'+SWplayers[1], 342, 415);
+            //SE
+            moveTargetToCoords('p'+SEplayers[0], 589, 405);
+            moveTargetToCoords('p'+SEplayers[1], 599, 415);
+            redrawTethers();
+            drawMarkersOnPlayers(tetheredPlayers2);
+
+        }, 1000);
+
+        // 3. wait and then show 2nd puddle set; wait and then hide 1st puddle set, animate later
+        setTimeout(function(){
+            showAndFadeImage("puddles2");
+        }, 1500);
+        setTimeout(function(){
+            hideAndFadeImage("puddles1");
+        }, 1750);
+
+        // 4. move players up and down by another 100 pixels each; also redraw tethers and prey markers
+        setTimeout(function(){
+            //NW
+            moveTargetToCoords('p'+NWplayers[0], 342, 63);
+            moveTargetToCoords('p'+NWplayers[1], 352, 73);
+            //NE
+            moveTargetToCoords('p'+NEplayers[0], 599, 63);
+            moveTargetToCoords('p'+NEplayers[1], 589, 73);
+            //SW
+            moveTargetToCoords('p'+SWplayers[0], 352, 505);
+            moveTargetToCoords('p'+SWplayers[1], 342, 515);
+            //SE
+            moveTargetToCoords('p'+SEplayers[0], 589, 505);
+            moveTargetToCoords('p'+SEplayers[1], 599, 515);
+            redrawTethers();
+            drawMarkersOnPlayers(tetheredPlayers2);
+
+        }, 2000);
+
+        // 5. show 3rd puddle set; wait and then hide 2nd puddle set, animate later
+        setTimeout(function(){
+            showAndFadeImage("puddles3");
+            showGroup("targets_3"); // later change if we have inner/outer markers toggle implemented
+            // also set text
+            setText("status", "Now, the moment of truth! Choose your final spot. Choose wrong and your party may die!!");
+        }, 2500);
+        setTimeout(function(){
+            hideAndFadeImage("puddles2");
+        }, 2750);
+
+        // re-enable the reset button after the animation
+        setTimeout(enableResetButton, 3000);
+    }
+
+    function drawMarkersOnPlayers(baitPlayers)
+    {
+        // position markers over players without showing/hiding
+        for(var i = 0; i < baitPlayers.length; i++)
+        {
+            var markerImg = document.getElementById("pm_" + (i + 1));
+            var playerImg = document.getElementById("p" + baitPlayers[i]);
+            // position marker over player
+            markerImg.style.left = (parseFloat(playerImg.style.left) + playerImg.width / 2 - markerImg.width / 2) + "px";
+            markerImg.style.top = (parseFloat(playerImg.style.top) - markerImg.height) + "px";
+        }
+    }
+
+    function resolveFinalSpots(choice)
+    {
+        assignFinalSpots();
+        if(finalAssignments[role] === choice)
+        {
+            // set success state
+            setText("status", "<strong>[Success!]</strong> - Correct final spot.");
+        }
+        else
+        {
+            setBgAndColor("status", failBgColor, failColor);
+            setText("status", "<strong>[FAIL]</strong> - Incorrect final spot.");
+            finalAssignments[role] = choice; // for showing where they went
+            killed = 1;
+            lose++;
+        }
+
+        // move all players
+        for(var i = 0; i < 8; i++)
+        {
+            if(i != role)
+            {   
+                moveCharToTarget('p'+i, 't_W_'+ finalAssignments[i]);
+            }
+            else
+            {
+                // current player
+                moveCharToTarget('p'+role, 't_W_'+ choice);
+            }
+        }
+
+        redrawTethers();
+        drawMarkersOnPlayers(tetheredPlayers2); // show prey markers on non-tethered players
+        hideAndFadeImage("puddles3");
+        hideGroup("targets_3");
+        setTimeout(drawFinalAoEs, 1000);
+        setTimeout(function() {
+            // show the next button
+            var nextButton = document.getElementById("nextImg");
+            nextButton.style.display = "block";
+            nextButton.setAttribute("onclick", "swapTethersAndRepeat()");
+        }, 2000);
+    }
+
+    function assignFinalSpots()
+    {
+        finalAssignments = []; // Reset
+        //NW corner: tethered player (index 0) goes to the edge, non-tethered (index 1) goes to outer corner of 1 waymark
+        // also account for the arena cleave
+        if(arenaCleave == 0) // west cleave
+        {
+            // 1 marker (NW)
+            finalAssignments[NWplayers[0]] = '1NEE'; // tethered to NE edge
+            finalAssignments[NWplayers[1]] = '1NEC'; // non-tethered to NE (outer) corner
+            // 2 marker (NE)
+            finalAssignments[NEplayers[0]] = '2NEE'; // tethered to NE edge
+            finalAssignments[NEplayers[1]] = '2NEC'; // non-tethered to NE (outer) corner
+            // 3 marker (SW)
+            finalAssignments[SWplayers[0]] = '3SEE'; // tethered to SE edge
+            finalAssignments[SWplayers[1]] = '3SEC'; // non-tethered to SE (outer) corner
+            // 4 marker (SE)
+            finalAssignments[SEplayers[0]] = '4SEE'; // tethered to SE edge
+            finalAssignments[SEplayers[1]] = '4SEC'; // non-tethered to SE (outer) corner
+
+        }
+        else // east cleave
+        {
+            // 1 marker (NW)
+            finalAssignments[NWplayers[0]] = '1NWE'; // tethered to NW edge
+            finalAssignments[NWplayers[1]] = '1NWC'; // non-tethered to NW (outer) corner
+            // 2 marker (NE)
+            finalAssignments[NEplayers[0]] = '2NWE'; // tethered to NW edge
+            finalAssignments[NEplayers[1]] = '2NWC'; // non-tethered to NW (outer) corner
+            // 3 marker (SW)
+            finalAssignments[SWplayers[0]] = '3SWE'; // tethered to SW edge
+            finalAssignments[SWplayers[1]] = '3SWC'; // non-tethered to SW (outer) corner
+            // 4 marker (SE)
+            finalAssignments[SEplayers[0]] = '4SWE'; // tethered to SW edge
+            finalAssignments[SEplayers[1]] = '4SWC'; // non-tethered to SW (outer) corner
+        }
+
+        //delay drawing final AoEs to allow players to move first
+        
+    }
+
+    function drawFinalAoEs()
+    {
+        // reset the aoes' widths so they animate outwards
+        // reset width 1
+        for(var i = 1; i <=4; i++)
+        {
+            var aoeT = document.getElementById("tetherAoE" + i);
+            aoeT.style.width = "0px";
+            var aoeB = document.getElementById("bossAoE" + i);
+            aoeB.style.width = "0px";
+        }
+
+        showGroup("tetherAoEs");
+        showGroup("bossAoEs");
+        var portalCoords;
+        for(var i = 0; i < 4; i++)
+        {
+            // Portal set 1 order:
+            // 1 = NW Corner, 2 = NE middle, 3 = SE middle, 4 = SW corner
+            // Portal set 2 order:
+            // 1 = NE Corner, 2 = NW middle, 3 = SW middle, 4 = SE corner
+            if(portalSet == 1)
+            {
+                portalCoords = portalSet1Coords[i];
+            }
+            else
+            {
+                portalCoords = portalSet2Coords[i];
+            }
+            drawLineFromPortalToPlayer(portalCoords, tetheredPlayers1[i], i + 1);
+            drawLineFromBossToPlayer(tetheredPlayers2[i], i + 1);
+        }
+        if(arenaCleave == 0) // west cleave
+        {
+            hideAndFadeImage("arenaCleaveWestTG");
+            showAndFadeImage("arenaCleaveWest");
+        }
+        else
+        {
+            hideAndFadeImage("arenaCleaveEastTG");
+            showAndFadeImage("arenaCleaveEast");
+        }
+    }
+
+    function drawLineFromPortalToPlayer(portalCoords, playerID, tetherID)
+    {
+        var playerImg = document.getElementById("p" + playerID);
+        
+        // Get player center using inline styles (which are relative to quiz block)
+        var playerCenterX = parseFloat(playerImg.style.left) + playerImg.width / 2;
+        var playerCenterY = parseFloat(playerImg.style.top) + playerImg.height / 2;
+
+        // Calculate differences from portal to player
+        var deltaX = playerCenterX - portalCoords.left;
+        var deltaY = playerCenterY - portalCoords.top;
+
+        // Calculate distance and angle
+        var distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        var angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+
+        // Normalize angle to 0-360 range
+        var normalizedAngle = angle % 360; // Ensure angle is within 0-360
+        
+        // Choose rotation direction (CW or CCW) based on which is closer
+        var rotationAngle = normalizedAngle > 180 ? normalizedAngle - 360 : normalizedAngle;
+
+        // Adjust rotation direction to ensure the shorter path is taken
+        if (rotationAngle < -180) {
+            rotationAngle += 360;
+        } else if (rotationAngle > 180) {
+            rotationAngle -= 360;
+        }
+
+        // Set tether properties
+        var tetherDiv = document.getElementById("tetherAoE" + tetherID);
+        tetherDiv.style.left = portalCoords.left + "px";
+        tetherDiv.style.top = portalCoords.top + "px";
+        tetherDiv.style.width = distance + "px";
+        tetherDiv.style.transform = "rotate(" + rotationAngle + "deg)";
+    }
+
+    function drawLineFromBossToPlayer(playerID, aoeID)
+    {
+        var playerImg = document.getElementById("p" + playerID);
+        bossCoords = {left: 465, top: 289}; // fixed boss coords
+
+        // Get player center using inline styles (which are relative to quiz block)
+        // Get player center using inline styles (which are relative to quiz block)
+        var playerCenterX = parseFloat(playerImg.style.left) + playerImg.width / 2;
+        var playerCenterY = parseFloat(playerImg.style.top) + playerImg.height / 2;
+
+        // Calculate differences from portal to player
+        var deltaX = playerCenterX - bossCoords.left;
+        var deltaY = playerCenterY - bossCoords.top;
+
+        // Calculate distance and angle
+        var distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        var angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+
+        // Normalize angle to 0-360 range
+        var normalizedAngle = angle % 360; // Ensure angle is within 0-360
+        
+        // Choose rotation direction (CW or CCW) based on which is closer
+        var rotationAngle = normalizedAngle > 180 ? normalizedAngle - 360 : normalizedAngle;
+
+        // Adjust rotation direction to ensure the shorter path is taken
+        if (rotationAngle < -180) {
+            rotationAngle += 360;
+        } else if (rotationAngle > 180) {
+            rotationAngle -= 360;
+        }
+
+        // Set tether properties
+        var tetherDiv = document.getElementById("bossAoE" + aoeID);
+        tetherDiv.style.left = bossCoords.left + "px";
+        tetherDiv.style.top = bossCoords.top + "px";
+        tetherDiv.style.width = distance + "px";
+        tetherDiv.style.transform = "rotate(" + rotationAngle + "deg)";
+
+
+    }
+
+    function swapTethersAndRepeat()
+    {
+        // swap tether assignments -- tetheredPlayers2 become tetheredPlayers1 and vice versa
+        var temp = tetheredPlayers1;
+        tetheredPlayers1 = tetheredPlayers2;
+        tetheredPlayers2 = temp;
+        // portals also swap, but the half cleave does not (?)
+        portalSet = (portalSet == 1) ? 2 : 1;
+        if(portalSet == 1)
+        {
+            showAndFadeImage("portals1");
+            hideAndFadeImage("portals2");
+        }
+        else
+        {
+            showAndFadeImage("portals2");
+            hideAndFadeImage("portals1");
+        }
+
+        if(arenaCleave == 0) // west
+        {
+            showAndFadeImage("arenaCleaveWestTG");
+            hideAndFadeImage("arenaCleaveWest");
+        }
+        else
+        {
+            showAndFadeImage("arenaCleaveEastTG");
+            hideAndFadeImage("arenaCleaveEast");
+        }
+
+        // hide line AoEs, prey markers
+        hideAndFadeGroup("tetherAoEs");
+        hideAndFadeGroup("bossAoEs");
+        hideAndFadeGroup("preymarkers");
+
+
+        showGroup("targets_1");
+
+        assignPlayerTowers();
+        showAndFadeImage("towers");
+        redrawTethers();
+
+        // reset next button
+        var nextButton = document.getElementById("nextImg");
+        nextButton.style.display = "none";
+        nextButton.onclick = null;
+    }
+
+    function disableResetButton()
+    {
+        document.getElementById("resetImg").onclick = function() { return false; };
+        document.getElementById("resetImg").style.filter = "grayscale(100%)";
+        document.getElementById("resetImg").style.pointerEvents = "none";
+    }
+
+    function enableResetButton()
+    {
+        document.getElementById("resetImg").onclick = setupBoard;
+        document.getElementById("resetImg").style.filter = "grayscale(0%)";
+        document.getElementById("resetImg").style.pointerEvents = "auto";
+    }
+
+    window.onload = function() {
+        setupBoard();
+    };
+</script>

@@ -1,0 +1,8 @@
+mechanic order:
+    -conga on each side
+    -4 tethers go out, each on a random player
+        >a player may have to swap sides to stretch their tether, or stay on the same side
+        >afterwards, they'll have to determine to go north or south
+    -4 non-tethered players
+        >with no-buddies strategy, they will always stay on their platform.
+        
