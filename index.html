@@ -161,7 +161,7 @@ var killed = false;    //is the player dead?
 var win = 0;
 var lose = 0;
 var inOut = 0;
-var outer = false; //False = inner corners, True = outer corners
+var outer = true; //False = inner corners, True = outer corners
 var wPortals = [];
 var ePortals = [];
 var portalSet = 1; //1 or 2
@@ -214,10 +214,20 @@ var noteColor = "#000066";
         <img src="img/boss.png" alt="Boss" id="boss" style="top: 182px; left: 378px;">
 
         <!-- Outer corner waymarks-->
-        <img src="img/way_1.png" alt="Waymark 1" id="way1" class="waymark" style="top: 100px; left: 200px;">
-        <img src="img/way_2.png" alt="Waymark 2" id="way2" class="waymark" style="top: 100px; left: 680px;">
-        <img src="img/way_3.png" alt="Waymark 3" id="way3" class="waymark" style="top: 430px; left: 200px;">
-        <img src="img/way_4.png" alt="Waymark 4" id="way4" class="waymark" style="top: 430px; left: 680px;">
+        <div id="outerwaymarks">
+            <img src="img/way_1.png" alt="Waymark 1" id="way1" class="waymark" style="top: 100px; left: 200px;">
+            <img src="img/way_2.png" alt="Waymark 2" id="way2" class="waymark" style="top: 100px; left: 680px;">
+            <img src="img/way_3.png" alt="Waymark 3" id="way3" class="waymark" style="top: 430px; left: 200px;">
+            <img src="img/way_4.png" alt="Waymark 4" id="way4" class="waymark" style="top: 430px; left: 680px;">
+        </div>
+
+        <!--Inner corner waymarks-->
+        <div id="innerwaymarks" style="display: none;"> 
+            <img src="img/way_1.png" alt="Waymark 1i" id="way1in" class="waymark" style="top: 76px; left: 212px;">
+            <img src="img/way_2.png" alt="Waymark 2i" id="way2in" class="waymark" style="top: 76px; left: 668px;">
+            <img src="img/way_3.png" alt="Waymark 3i" id="way3in" class="waymark" style="top: 454px; left: 212px;">
+            <img src="img/way_4.png" alt="Waymark 4i" id="way4in" class="waymark" style="top: 454px; left: 668px;">
+        </div>
 
         <!-- Portals -->
         <img src="img/portals_1.png" alt="Portal Pattern 1" id="portals1">
@@ -364,6 +374,7 @@ var noteColor = "#000066";
         <img id="resetImg" style="right: 60px; top: 10px; border-radius: 5px; cursor: pointer; filter: grayscale(0%)" src="img/reset.png" onclick="setupBoard()"/>
         <img id="roleImg" style="left: 10px; top: 10px; border-radius: 5px; cursor: pointer;" src="img/iconmt.png" onclick="changeRole()"/>
         <img id="nextImg" style="left: 396px; top: 375px; cursor: pointer; display: none;" src="img/next.png" onclick=""/>
+        <img id="toggleInnerOuterImg" style="left: 10px; top: 520px; border-radius: 5px; cursor: pointer; display: inline; opacity: 0.7" src="img/outer.png" onclick="toggleInnerOuter()"/>
     </div>
  </div>
 </body>
@@ -372,7 +383,7 @@ var noteColor = "#000066";
     //Setup/reset board
     function setupBoard()
     {
-        step = 0;
+        stage = 0;
         killed = false;
         setText("winText", win);
         setText("loseText", lose);
@@ -404,11 +415,16 @@ var noteColor = "#000066";
         var nextButton = document.getElementById("nextImg");
         nextButton.style.display = "none";
         nextButton.onclick = null;
+
+        // re-enable inner/outer toggle
+        var toggleButton = document.getElementById("toggleInnerOuterImg");
+        toggleButton.style.display = "inline";
+        toggleButton.onclick = toggleInnerOuter;
         
 
         // reset text
         setBgAndColor("status", "", "");
-        setText("status", "Mechanic reset.  Good luck!");
+        setText("status", "You're about to start Arena Split. Tethers are going out and towers are spawning. Make sure to go to the right place, or risk spelling doom for your party! <strong>(If you wish to change to inner/outer markers, do so now by clicking the button in the lower left)</strong>");
 
         // assign default platform positions for players
         NWplayers = [0, 6]; // MT, R1
@@ -656,6 +672,13 @@ var noteColor = "#000066";
 
     function resolveTowers(choice)
     {  
+
+            // disable inner/outer toggle till mechanic is reset
+            var toggleButton = document.getElementById("toggleInnerOuterImg");
+            toggleButton.style.display = "none";
+            toggleButton.onclick = null;
+
+
             if(towerAssignments.length == 0)
             {
                 assignPlayerTowers();
@@ -755,6 +778,7 @@ var noteColor = "#000066";
             //setText("status", "W side: " + NWplayers.concat(SWplayers).join(", ") + " | E side: " + NEplayers.concat(SEplayers).join(", "));
             //debug: show tether assignments
             //setText("status", "Tethered players: " + tetheredPlayers1.join(", "));
+
 
         } // end resolveTowers
 
@@ -1311,12 +1335,21 @@ var noteColor = "#000066";
         hideAndFadeImage("puddles3");
         hideGroup("targets_3");
         setTimeout(drawFinalAoEs, 1000);
+        // if stage is 0, show next button after a delay
+        if(stage == 0)
+        {
         setTimeout(function() {
             // show the next button
             var nextButton = document.getElementById("nextImg");
             nextButton.style.display = "block";
             nextButton.setAttribute("onclick", "swapTethersAndRepeat()");
         }, 2000);
+        }
+        else
+        {
+            setText("status", "Round complete! You may reset to try again.");
+            win++;
+        }
     }
 
     function assignFinalSpots()
@@ -1329,15 +1362,19 @@ var noteColor = "#000066";
             // 1 marker (NW)
             finalAssignments[NWplayers[0]] = '1NEE'; // tethered to NE edge
             finalAssignments[NWplayers[1]] = '1NEC'; // non-tethered to NE (outer) corner
+            if(!outer) finalAssignments[NWplayers[1]] = '1SEC'; // non-tethered to SE (inner) corner
             // 2 marker (NE)
             finalAssignments[NEplayers[0]] = '2NEE'; // tethered to NE edge
             finalAssignments[NEplayers[1]] = '2NEC'; // non-tethered to NE (outer) corner
+            if(!outer) finalAssignments[NEplayers[1]] = '2SEC'; // non-tethered to SE (inner) corner
             // 3 marker (SW)
             finalAssignments[SWplayers[0]] = '3SEE'; // tethered to SE edge
             finalAssignments[SWplayers[1]] = '3SEC'; // non-tethered to SE (outer) corner
+            if(!outer) finalAssignments[SWplayers[1]] = '3NEC'; // non-tethered to NE (inner) corner
             // 4 marker (SE)
             finalAssignments[SEplayers[0]] = '4SEE'; // tethered to SE edge
             finalAssignments[SEplayers[1]] = '4SEC'; // non-tethered to SE (outer) corner
+            if(!outer) finalAssignments[SEplayers[1]] = '4NEC'; // non-tethered to NE (inner) corner
 
         }
         else // east cleave
@@ -1345,15 +1382,19 @@ var noteColor = "#000066";
             // 1 marker (NW)
             finalAssignments[NWplayers[0]] = '1NWE'; // tethered to NW edge
             finalAssignments[NWplayers[1]] = '1NWC'; // non-tethered to NW (outer) corner
+            if(!outer) finalAssignments[NWplayers[1]] = '1SWC'; // non-tethered to SW (inner) corner
             // 2 marker (NE)
             finalAssignments[NEplayers[0]] = '2NWE'; // tethered to NW edge
             finalAssignments[NEplayers[1]] = '2NWC'; // non-tethered to NW (outer) corner
+            if(!outer) finalAssignments[NEplayers[1]] = '2SWC'; // non-tethered to SW (inner) corner
             // 3 marker (SW)
             finalAssignments[SWplayers[0]] = '3SWE'; // tethered to SW edge
             finalAssignments[SWplayers[1]] = '3SWC'; // non-tethered to SW (outer) corner
+            if(!outer) finalAssignments[SWplayers[1]] = '3NWC'; // non-tethered to NW (inner) corner
             // 4 marker (SE)
             finalAssignments[SEplayers[0]] = '4SWE'; // tethered to SW edge
             finalAssignments[SEplayers[1]] = '4SWC'; // non-tethered to SW (outer) corner
+            if(!outer) finalAssignments[SEplayers[1]] = '4NWC'; // non-tethered to NW (inner) corner
         }
 
         //delay drawing final AoEs to allow players to move first
@@ -1528,6 +1569,9 @@ var noteColor = "#000066";
         var nextButton = document.getElementById("nextImg");
         nextButton.style.display = "none";
         nextButton.onclick = null;
+
+        // increment stage
+        stage = 1;
     }
 
     function disableResetButton()
@@ -1543,6 +1587,98 @@ var noteColor = "#000066";
         document.getElementById("resetImg").style.filter = "grayscale(0%)";
         document.getElementById("resetImg").style.pointerEvents = "auto";
     }
+
+    function toggleInnerOuter()
+    {
+        var toggleButton = document.getElementById("toggleInnerOuterImg");
+        if(outer) // if we're already on outer, switch to inner
+        {
+            hideGroup("outerwaymarks");
+            showGroup("innerwaymarks");
+            outer = false;
+            //swap the button image
+            toggleButton.src = "img/inner.png";
+            // move the target circles to inner positions
+            var element;
+            var currentTop;
+            var currentLeft;
+            var px = -24;
+            var pxH = 12;
+            for(var i = 1; i <= 4; i++)
+            {
+                if(i == 3) px = 24; // south markers go opposite
+                if(i%2 == 0) pxH = -12; else pxH = 12; // 1/3 move right, 2/4 move left
+                // outer positions: north down 24, south down 24
+                element = document.getElementById("t_W_" + i + "NWC");
+                currentTop = parseFloat(element.style.top);
+                currentLeft = parseFloat(element.style.left);
+                element.style.top = (currentTop + px) + "px";
+                element.style.left = (currentLeft + pxH) + "px";
+
+                element = document.getElementById("t_W_" + i + "NEC");
+                currentTop = parseFloat(element.style.top);
+                currentLeft = parseFloat(element.style.left);
+                element.style.top = (currentTop + px) + "px";
+                element.style.left = (currentLeft + pxH) + "px";
+
+                element = document.getElementById("t_W_" + i + "SWC");
+                currentTop = parseFloat(element.style.top);
+                currentLeft = parseFloat(element.style.left);
+                element.style.top = (currentTop + px) + "px";
+                element.style.left = (currentLeft + pxH) + "px";
+
+                element = document.getElementById("t_W_" + i + "SEC");
+                currentTop = parseFloat(element.style.top);
+                currentLeft = parseFloat(element.style.left);
+                element.style.top = (currentTop + px) + "px";
+                element.style.left = (currentLeft + pxH) + "px";
+            }
+        }
+        else
+        {
+            hideGroup("innerwaymarks");
+            showGroup("outerwaymarks");
+            outer = true;
+            //swap the button image
+            toggleButton.src = "img/outer.png";
+            // move the target circles to outer positions
+            var element;
+            var currentTop;
+            var currentLeft;
+            var px = 24;
+            var pxH = -12;
+            for(var i = 1; i <= 4; i++)
+            {
+                if(i == 3) px = -24; // south markers go opposite
+                if(i%2 == 0) pxH = 12; else pxH = -12; // 1/3 move left, 2/4 move right
+                // outer positions: north down 24, south down 24
+                element = document.getElementById("t_W_" + i + "NWC");
+                currentTop = parseFloat(element.style.top);
+                currentLeft = parseFloat(element.style.left);
+                element.style.top = (currentTop + px) + "px";
+                element.style.left = (currentLeft + pxH) + "px";
+
+                element = document.getElementById("t_W_" + i + "NEC");
+                currentTop = parseFloat(element.style.top);
+                currentLeft = parseFloat(element.style.left);
+                element.style.top = (currentTop + px) + "px";
+                element.style.left = (currentLeft + pxH) + "px";
+
+                element = document.getElementById("t_W_" + i + "SWC");
+                currentTop = parseFloat(element.style.top);
+                currentLeft = parseFloat(element.style.left);
+                element.style.top = (currentTop + px) + "px";
+                element.style.left = (currentLeft + pxH) + "px";
+
+                element = document.getElementById("t_W_" + i + "SEC");
+                currentTop = parseFloat(element.style.top);
+                currentLeft = parseFloat(element.style.left);
+                element.style.top = (currentTop + px) + "px";
+                element.style.left = (currentLeft + pxH) + "px";
+            }
+        }
+    }
+
 
     window.onload = function() {
         setupBoard();
